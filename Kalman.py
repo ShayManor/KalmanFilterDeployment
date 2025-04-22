@@ -1,5 +1,4 @@
 import numpy as np
-# after step 3, X1, Z(0), X(0) switches colors.
 
 
 def inf_to_cov(V, B, domain):

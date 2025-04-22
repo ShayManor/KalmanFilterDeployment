@@ -295,8 +295,9 @@ def run_kalman_filter():
     global current_step, last_kalman_gain, kalman_results
     data = request.get_json()
     matrices = data["matrices"]
-    Z = np.array([[502.55], [-0.9316]])
-    u = np.array([[400], [0], [0], [-300], [0], [0]])
+    print(matrices)
+    Z = np.array(matrices.get('Z'))
+    u = np.array(matrices.get('u'))
     X = np.array(
         [
             [1125, 750, 250, 0, 0, 0],
