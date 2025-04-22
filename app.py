@@ -142,8 +142,6 @@ def get_graph_step():
                     node["distribution"] = {"mean": "0", "cov": cov_latex}
                     node["original_distribution"] = {"mean": "0", "cov": "$R_1$"}
                     node["bottomLabel"] = "$\\bigl(0,\\;R_1\\bigr)$"
-                else:
-                    print("Error with R: " + R_mat)
 
             elif nid == "Z(0)":
                 h_mat = kalman_results.get("h")
@@ -178,13 +176,13 @@ def get_graph_step():
                         node["original_distribution"] = {"mean": "$\\hat{x}_{1|0}$", "cov": "$P_{1|0}$"}
                         node["bottomLabel"] = "$\\bigl(\\hat{x}_{1|0},\\;P_{1|0}\\bigr)$"
                 elif current_step == 2:
-                        u1 = kalman_results.get("u0")
-                        P1_mat = kalman_results.get("P1")
-                        if u1 is not None and P1_mat is not None:
-                            mean_latex = matrix_to_latex(u1)
-                            cov_latex = matrix_to_latex(P1_mat)
-                            node["distribution"] = {"mean": mean_latex, "cov": cov_latex}
-                        node["bottomLabel"] = "$\\bigl(\\hat{x}_{1|0},\\;P_{1|1}\\bigr)$"
+                    u1 = kalman_results.get("u0")
+                    P1_mat = kalman_results.get("P1")
+                    if u1 is not None and P1_mat is not None:
+                        mean_latex = matrix_to_latex(u1)
+                        cov_latex = matrix_to_latex(P1_mat)
+                        node["distribution"] = {"mean": mean_latex, "cov": cov_latex}
+                    node["bottomLabel"] = "$\\bigl(\\hat{x}_{1|0},\\;P_{1|1}\\bigr)$"
                 else:
                     u1 = kalman_results.get("u1")
                     P1_mat = kalman_results.get("P1")
@@ -297,16 +295,16 @@ def run_kalman_filter():
     u = np.array([[400], [0], [0], [-300], [0], [0]])
     X = np.array(
         [
-        [1125, 750, 250, 0, 0, 0],
-        [750, 1000, 500, 0, 0, 0],
-        [250, 500, 500, 0, 0, 0],
-        [0, 0, 0, 1125, 750, 250],
-        [0, 0, 0, 750, 1000, 500],
-        [0, 0, 0, 250, 500, 500],
+            [1125, 750, 250, 0, 0, 0],
+            [750, 1000, 500, 0, 0, 0],
+            [250, 500, 500, 0, 0, 0],
+            [0, 0, 0, 1125, 750, 250],
+            [0, 0, 0, 750, 1000, 500],
+            [0, 0, 0, 250, 500, 500],
         ]
     )
     V = np.zeros((6, 1))
-    R = np.array([[25, 0], [0, 0.0087**2]])
+    R = np.array([[25, 0], [0, 0.0087 ** 2]])
     H = np.array([[0.8, 0, 0, -0.6, 0, 0], [0.0012, 0, 0, 0.0016, 0, 0]])
     Phi = np.array([
         [1, 1, 0.5, 0, 0, 0],
@@ -324,7 +322,7 @@ def run_kalman_filter():
         [0, 0, 0, 0.25, 0.5, 0.5],
         [0, 0, 0, 0.5, 1, 1],
         [0, 0, 0, 0.5, 1, 1],
-    ]) * (0.2**2)
+    ]) * (0.2 ** 2)
     h = np.array([[500], [-0.644]])
 
     u_updated, B_updated, V_updated, K, S, P1, u1 = kalman(0, Z, u, X, V, R, H, Phi, gamma, Qk, 1, h)
@@ -352,16 +350,14 @@ def run_kalman_filter():
         "H": H,
         "Phi": Phi
     }
-    print(kalman_results)
     last_kalman_gain = K.tolist() if K is not None else None
     current_step = 0
-    print("Kalman gain:", last_kalman_gain)
     return jsonify({"kalman_gain": last_kalman_gain, "current_step": current_step})
 
 
 @app.route("/")
 def root_index():
-    return send_from_directory("static", "static/index.html")
+    return app.send_static_file("index.html")
 
 
 if __name__ == "__main__":

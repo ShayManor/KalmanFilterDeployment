@@ -549,59 +549,60 @@ def kalman(k, Z, u, X, V, R, H, Phi, gamma, Qk, Form, h=None):
 
     return u, B, V, K, S, P1, u1
 
+if __name__ == '__main__':
 
-Z_default = np.array([[502.55], [-0.9316]])
-u_default = np.array([[400], [0], [0], [-300], [0], [0]])
-X_default = np.array(
-        [
-        [1125, 750, 250, 0, 0, 0],
-        [750, 1000, 500, 0, 0, 0],
-        [250, 500, 500, 0, 0, 0],
-        [0, 0, 0, 1125, 750, 250],
-        [0, 0, 0, 750, 1000, 500],
-        [0, 0, 0, 250, 500, 500],
-        ]
-    )
-V_default = np.zeros((6, 1))
-R_default = np.array([[25, 0], [0, 0.0087**2]])    
-H_default = np.array([[0.8, 0, 0, -0.6, 0, 0], [0.0012, 0, 0, 0.0016, 0, 0]])
-Phi_default = np.array([
-        [1, 1, 0.5, 0, 0, 0],
-        [0, 1, 1, 0, 0, 0],
-        [0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 1, 1, 0.5],
-        [0, 0, 0, 0, 1, 1],
-        [0, 0, 0, 0, 0, 1],
-    ])
-gamma_default = np.eye(6)
-Qk_default = np.array([
-        [0.25, 0.5, 0.5, 0, 0, 0],
-        [0.5, 1, 1, 0, 0, 0],
-        [0.5, 1, 1, 0, 0, 0],
-        [0, 0, 0, 0.25, 0.5, 0.5],
-        [0, 0, 0, 0.5, 1, 1],
-        [0, 0, 0, 0.5, 1, 1],
-    ]) * (0.2**2)
-h_default = np.array([[500], [-0.644]])
+    Z_default = np.array([[502.55], [-0.9316]])
+    u_default = np.array([[400], [0], [0], [-300], [0], [0]])
+    X_default = np.array(
+            [
+            [1125, 750, 250, 0, 0, 0],
+            [750, 1000, 500, 0, 0, 0],
+            [250, 500, 500, 0, 0, 0],
+            [0, 0, 0, 1125, 750, 250],
+            [0, 0, 0, 750, 1000, 500],
+            [0, 0, 0, 250, 500, 500],
+            ]
+        )
+    V_default = np.zeros((6, 1))
+    R_default = np.array([[25, 0], [0, 0.0087**2]])
+    H_default = np.array([[0.8, 0, 0, -0.6, 0, 0], [0.0012, 0, 0, 0.0016, 0, 0]])
+    Phi_default = np.array([
+            [1, 1, 0.5, 0, 0, 0],
+            [0, 1, 1, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0.5],
+            [0, 0, 0, 0, 1, 1],
+            [0, 0, 0, 0, 0, 1],
+        ])
+    gamma_default = np.eye(6)
+    Qk_default = np.array([
+            [0.25, 0.5, 0.5, 0, 0, 0],
+            [0.5, 1, 1, 0, 0, 0],
+            [0.5, 1, 1, 0, 0, 0],
+            [0, 0, 0, 0.25, 0.5, 0.5],
+            [0, 0, 0, 0.5, 1, 1],
+            [0, 0, 0, 0.5, 1, 1],
+        ]) * (0.2**2)
+    h_default = np.array([[500], [-0.644]])
 
-u, B, V, K, S, P1, u1 = kalman(0, Z_default, u_default, X_default, V_default, R_default, 
-                       H_default, Phi_default, gamma_default, Qk_default, 1, h_default)
-# K1
-print("Kalman Matrix")
-print(K)
+    u, B, V, K, S, P1, u1 = kalman(0, Z_default, u_default, X_default, V_default, R_default,
+                           H_default, Phi_default, gamma_default, Qk_default, 1, h_default)
+    # K1
+    print("Kalman Matrix")
+    print(K)
 
-# S1
-print("Innovation Matrix")
-print(S)
+    # S1
+    print("Innovation Matrix")
+    print(S)
 
-# P2|1
-print("Covariance matrix")
-print(B)
+    # P2|1
+    print("Covariance matrix")
+    print(B)
 
-# P1|1
-print("P1|1 Matrix")
-print(P1)
+    # P1|1
+    print("P1|1 Matrix")
+    print(P1)
 
-# u1|1
-print("u1|1")
-print(u1)
+    # u1|1
+    print("u1|1")
+    print(u1)
