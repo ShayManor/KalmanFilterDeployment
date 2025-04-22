@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Kalman Filter Step‐Through</title>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css"/>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 20px; }
+    .matrix-container { background: #fff; margin-bottom: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    #dimensionForm { margin-bottom: 20px; }
+    #dimensionInputsRow { display: flex; align-items: center; gap: 20px; }
+    #dimensionInputsRow > div label { display: inline-block; margin-right: 5px; font-weight: bold; }
+    #dimensionForm input[type="number"] { width: 80px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    #matrixSelect { width: 300px; padding: 8px; font-size: 16px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; }
+    .hot-container { margin-bottom: 15px; min-height: 100px; }
+    .hidden { display: none; }
+    button { background-color: #007bff; color: #fff; padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+    button:hover { background-color: #0056b3; }
+    #graph { border: 1px solid #ccc; margin-top: 20px; }
+    .link { stroke: #999; stroke-width: 2px; marker-end: url(#arrow); }
+    .node circle { stroke: black; stroke-width: 1px; cursor: pointer; }
+    .edgeLabel { cursor: pointer; }
+    #modalOverlay { position: fixed; display: none; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.3); z-index: 999; }
+    #modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border: 1px solid #666; border-radius: 6px; padding: 20px; min-width: 400px; max-width: 80vw; }
+    #modalContent { margin: 10px 0; }
+    #legend { margin-top: 15px; font-size: 14px; }
+    #legend .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+    #legend .legend-color-box { width: 20px; height: 20px; margin-right: 8px; border: 1px solid #444; }
+    .bottomLabel { font-size: 12px; color: #333; }
+    .step-display { font-weight: bold; font-size: 18px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Kalman Filter Step‐Through</h1>
+  <!-- Matrix Input Panel -->
+  <div id="matrixInputPanel" class="matrix-container">
+    <h2>Step 1: Input Matrices</h2>
+    <div id="dimensionForm">
+      <div id="dimensionInputsRow">
+        <div>
+          <label for="nInput">n (State Size):</label>
+          <input type="number" id="nInput" value="6" min="1"/>
+        </div>
+        <div>
+          <label for="pInput">p (Measurement Size):</label>
+          <input type="number" id="pInput" value="2" min="1"/>
+        </div>
+        <div>
+          <label for="rInput">r (Noise Size):</label>
+          <input type="number" id="rInput" value="6" min="1"/>
+        </div>
+      </div>
+      <br/><br/>
+      <button id="generateMatricesBtn">Generate Matrix Inputs</button>
+    </div>
+    <div id="matrixInputs" class="hidden">
+      <h3>Select Matrix to Edit</h3>
+      <select id="matrixSelect"></select>
+      <div id="matrixGridsContainer"></div>
+    </div>
+    <button id="resetMatricesBtn" class="hidden">Reset Matrices</button>
+    <div id="runPanel" class="hidden">
+      <button id="runKalmanBtn">Run Kalman Filter</button>
+    </div>
+  </div>
+  <!-- Influence Diagram -->
+  <div id="diagramPanel" class="matrix-container hidden">
+    <h2>Step 2: Influence Diagram</h2>
+    <div id="currentStepDisplay" class="step-display"></div>
+    <div id="controls">
+      <button id="backToInputBtn">Back to Input</button>
+      <button id="prevStepBtn">Previous Step</button>
+      <button id="nextStepBtn">Next Step</button>
+    </div>
+    <svg id="graph" width="1000" height="600"></svg>
+    <div id="legend">
+      <div class="legend-item">
+        <div class="legend-color-box" style="background-color:#f4c2c2;"></div>
+        <span>Chance Node</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color-box" style="background-color:#00afee;"></div>
+        <span>Deterministic Node</span>
+      </div>
+    </div>
+  </div>
+  <!-- Kalman Gain Panel -->
+  <div id="kalmanGainPanel" class="matrix-container hidden">
+    <h2>Step 3: Kalman Gain</h2>
+    <div id="kalmanGainHot" style="min-height:100px;"></div>
+  </div>
+  <!-- Modal for showing mean and covariance -->
+  <div id="modalOverlay">
+    <div id="modal">
+      <div id="modalContent"></div>
+      <button id="closeBtn">Close</button>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    // --- Matrix Input Panel Code ---
+    const matricesInfo = [
+      {name:"Z",    label:"Z (Measurement Values)", rows:(n,p,r)=>p, cols:(n,p,r)=>1},
+      {name:"u",    label:"u (State Mean Vector)",  rows:(n,p,r)=>n, cols:(n,p,r)=>1},
+      {name:"X",    label:"X (Covariance Matrix)",  rows:(n,p,r)=>n, cols:(n,p,r)=>n},
+      {name:"V",    label:"V (Measurement Noise)",  rows:(n,p,r)=>n, cols:(n,p,r)=>1},
+      {name:"R",    label:"R (Measurement Noise Covariance)", rows:(n,p,r)=>p, cols:(n,p,r)=>p},
+      {name:"H",    label:"H (Measurement Matrix)", rows:(n,p,r)=>p, cols:(n,p,r)=>n},
+      {name:"Phi",  label:"Phi (State Transition Matrix)",  rows:(n,p,r)=>n, cols:(n,p,r)=>n},
+      {name:"gamma",label:"gamma (Process Noise Matrix)",   rows:(n,p,r)=>n, cols:(n,p,r)=>r},
+      {name:"Qk",   label:"Qk (Process Noise Covariance)",  rows:(n,p,r)=>r, cols:(n,p,r)=>r},
+      {name:"h",    label:"h (Expected Measurement Values)", rows:(n,p,r)=>p, cols:(n,p,r)=>1}
+    ];
+    const matrixGrids = {};
+    document.getElementById("generateMatricesBtn").addEventListener("click", ()=>{
+      let n = parseInt(document.getElementById("nInput").value);
+      let p = parseInt(document.getElementById("pInput").value);
+      let r = parseInt(document.getElementById("rInput").value);
+      if(n < 1){ n = 1; document.getElementById("nInput").value = 1; }
+      if(p < 1){ p = 1; document.getElementById("pInput").value = 1; }
+      if(r < 1){ r = 1; document.getElementById("rInput").value = 1; }
+      const container = document.getElementById("matrixInputs");
+      container.innerHTML = `
+        <h3>Select Matrix to Edit</h3>
+        <select id="matrixSelect"></select>
+        <div id="matrixGridsContainer"></div>
+      `;
+      const selectEl = document.getElementById("matrixSelect");
+      const gridsContainer = document.getElementById("matrixGridsContainer");
+      matricesInfo.forEach((info, index)=>{
+        const option = document.createElement("option");
+        option.value = info.name;
+        option.textContent = info.label;
+        selectEl.appendChild(option);
+        const gridDiv = document.createElement("div");
+        gridDiv.className = "hot-container";
+        gridDiv.id = "grid-" + info.name;
+        gridDiv.style.display = (index===0) ? "block" : "none";
+        gridsContainer.appendChild(gridDiv);
+        const rows = info.rows(n, p, r);
+        const cols = info.cols(n, p, r);
+        const data = [];
+        for(let i=0; i<rows; i++){
+          const rowArr = [];
+          for(let j=0; j<cols; j++){
+            if(info.name === "gamma" && i === j) rowArr.push(1);
+            else rowArr.push(0);
+          }
+          data.push(rowArr);
+        }
+        matrixGrids[info.name] = new Handsontable(gridDiv, {
+          data: data,
+          rowHeaders: true,
+          colHeaders: true,
+          width: cols * 100,
+          licenseKey:"non-commercial-and-evaluation"
+        });
+      });
+      selectEl.addEventListener("change", function(){
+        const selected = this.value;
+        matricesInfo.forEach(info=>{
+          document.getElementById("grid-" + info.name).style.display =
+            (info.name === selected) ? "block" : "none";
+        });
+      });
+      container.classList.remove("hidden");
+      document.getElementById("resetMatricesBtn").classList.remove("hidden");
+      document.getElementById("runPanel").classList.remove("hidden");
+    });
+    document.getElementById("resetMatricesBtn").addEventListener("click", ()=>{
+      const n = parseInt(document.getElementById("nInput").value);
+      const p = parseInt(document.getElementById("pInput").value);
+      const r = parseInt(document.getElementById("rInput").value);
+      matricesInfo.forEach(info=>{
+        const rows = info.rows(n, p, r);
+        const cols = info.cols(n, p, r);
+        const newData = [];
+        for(let i=0; i<rows; i++){
+          const rowArr = [];
+          for(let j=0; j<cols; j++){
+            if(info.name === "gamma" && i === j) rowArr.push(1);
+            else rowArr.push(0);
+          }
+          newData.push(rowArr);
+        }
+        matrixGrids[info.name].loadData(newData);
+      });
+    });
+    document.getElementById("runKalmanBtn").addEventListener("click", ()=>{
+      const n = parseInt(document.getElementById("nInput").value);
+      const p = parseInt(document.getElementById("pInput").value);
+      const r = parseInt(document.getElementById("rInput").value);
+      const matrices = {};
+      matricesInfo.forEach(info=>{
+        matrices[info.name] = matrixGrids[info.name].getData();
+      });
+      fetch("/run_kalman", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({n, p, r, matrices})
+      })
+      .then(res => res.json())
+      .then(result=>{
+        console.log("Run result:", result);
+        document.getElementById("matrixInputPanel").classList.add("hidden");
+        document.getElementById("diagramPanel").classList.remove("hidden");
+        fetchGraphStep();
+      })
+      .catch(err => console.error("Error calling backend:", err));
+    });
+    /*************************************************************************
+     * Influence Diagram (D3)
+     *************************************************************************/
+    const svg = d3.select("#graph");
+    const linkGroup = svg.append("g").attr("class", "links");
+    const nodeGroup = svg.append("g").attr("class", "nodes");
+    const labelGroup = svg.append("g").attr("class", "labels");
+    svg.append("defs").append("marker")
+      .attr("id", "arrow")
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 28)
+      .attr("refY", 0)
+      .attr("markerWidth", 6)
+      .attr("markerHeight", 6)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M0,-5L10,0L0,5")
+      .attr("fill", "#999");
+    function openModal(htmlContent) {
+      d3.select("#modalContent").html(htmlContent);
+      d3.select("#modalOverlay").style("display", "block");
+      MathJax.typesetPromise([document.getElementById("modalContent")]);
+    }
+    function closeModal() {
+      d3.select("#modalOverlay").style("display", "none");
+    }
+    document.getElementById("closeBtn").onclick = closeModal;
+    let kalmanGainHOT = null;
+    const kgPanel = document.getElementById("kalmanGainPanel");
+    const kgDiv = document.getElementById("kalmanGainHot");
+    function fetchGraphStep() {
+      fetch("/graph_step")
+      .then(res => res.json())
+      .then(data => {
+        updateGraph(data);
+        updateKalmanGain(data);
+      })
+      .catch(err => console.error("Error fetching graph step:", err));
+    }
+    function operatorToGreek(op) {
+      if(!op) return "";
+      if(op.startsWith("gamma")){
+        let m = op.match(/\((\d+)\)/);
+        let idx = m ? m[1] : "";
+        return `$\\Gamma_{${idx}}$`;
+      }
+      if(op.toLowerCase().startsWith("phi")){
+        let m = op.match(/\((\d+)\)/);
+        let idx = m ? m[1] : "";
+        return `$\\Phi_{${idx}}$`;
+      }
+      if(op.startsWith("H")){
+        let m = op.match(/\((\d+)\)/);
+        let idx = m ? m[1] : "";
+        return `$H_{${idx}}$`;
+      }
+      if(op === "K1"){
+        return "$K_1$";
+      }
+      return `$${op}$`;
+    }
+    function updateGraph(data) {
+      document.getElementById("currentStepDisplay").textContent = data.step_display || "";
+      const nodes = data.nodes || [];
+      const edges = data.edges || [];
+      const linkSel = linkGroup.selectAll(".link").data(edges, d => d.source + "-" + d.target);
+      linkSel.exit().remove();
+      const linkEnter = linkSel.enter().append("line").attr("class", "link");
+      const allLinks = linkEnter.merge(linkSel);
+      allLinks
+        .attr("x1", d => (nodes.find(n => n.id === d.source) || {x:0}).x)
+        .attr("y1", d => (nodes.find(n => n.id === d.source) || {y:0}).y)
+        .attr("x2", d => (nodes.find(n => n.id === d.target) || {x:0}).x)
+        .attr("y2", d => (nodes.find(n => n.id === d.target) || {y:0}).y);
+      const nodeSel = nodeGroup.selectAll(".node").data(nodes, d => d.id);
+      nodeSel.exit().remove();
+      const nodeEnter = nodeSel.enter().append("g").attr("class", "node");
+      nodeEnter.append("circle")
+        .attr("r", 20)
+        .attr("fill", d => d.color || "#ccc")
+        .on("click", (evt, d) => {
+          if(!d.clickable) return;
+          const dist = d.distribution || {};
+          let mean = dist.mean || "N/A";
+          let cov  = dist.cov  || "N/A";
+          openModal(`
+            <div class="matrix-container" style="margin:0; box-shadow:none;">
+              <h3>${d.display || d.id}</h3>
+              <h4>Mean:</h4><div>${mean}</div>
+              <h4>Covariance:</h4><div>${cov}</div>
+            </div>
+          `);
+        });
+      nodeEnter.append("foreignObject")
+        .attr("class", "nodetext")
+        .attr("x", -30)
+        .attr("y", -10)
+        .attr("width", 60)
+        .attr("height", 40)
+        .html(d => `
+          <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:14px; text-align:center;">
+            ${d.display || d.id}
+          </div>
+        `);
+      nodeEnter.append("foreignObject")
+        .attr("class", "bottomLabel")
+        .attr("x", 15)
+        .attr("y", 15)
+        .attr("width", 100)
+        .attr("height", 30)
+        .html(d => `
+          <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:12px; color:#444;">
+            ${d.bottomLabel || ""}
+          </div>
+        `);
+      const allNodes = nodeEnter.merge(nodeSel);
+      allNodes.attr("transform", d => `translate(${d.x},${d.y})`);
+      allNodes.select("circle").attr("fill", d => d.color || "#ccc");
+      allNodes.select("foreignObject.bottomLabel")
+        .html(d => `<div xmlns="http://www.w3.org/1999/xhtml" style="font-size:12px; color:#444;">${d.bottomLabel || ""}</div>`);
+      const opData = edges.filter(d => d.operator);
+      const opSel = labelGroup.selectAll(".edgeLabel").data(opData, d => d.source + "-" + d.target);
+      opSel.exit().remove();
+      const opEnter = opSel.enter().append("foreignObject")
+        .attr("class", "edgeLabel")
+        .attr("width", 60)
+        .attr("height", 30)
+        .on("click", (evt, d) => {
+          let matHtml = "";
+          if(d.operator_matrix && Array.isArray(d.operator_matrix)){
+            matHtml = arrayToHTMLTable(d.operator_matrix);
+          } else if(d.operator_matrix){
+            matHtml = d.operator_matrix;
+          }
+          openModal(`
+            <div class="matrix-container" style="margin:0; box-shadow:none;">
+              <h3>Operator: ${operatorToGreek(d.operator) || "N/A"}</h3>
+              ${ matHtml ? ("<h4>Matrix:</h4>" + matHtml) : "<p>No matrix info available.</p>" }
+            </div>
+          `);
+        });
+      const allOpLabels = opEnter.merge(opSel);
+      allOpLabels
+        .attr("x", d=>{
+          const s = nodes.find(n => n.id === d.source);
+          const t = nodes.find(n => n.id === d.target);
+          if(!s || !t) return 0;
+          return s.x + 0.6 * (t.x - s.x) - 20;
+        })
+        .attr("y", d=>{
+          const s = nodes.find(n => n.id === d.source);
+          const t = nodes.find(n => n.id === d.target);
+          if(!s || !t) return 0;
+          return s.y + 0.6 * (t.y - s.y) - 15;
+        })
+        .html(d => `
+          <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:14px; text-align:center;">
+            ${operatorToGreek(d.operator)}
+          </div>
+        `);
+      MathJax.typesetPromise();
+    }
+    function arrayToHTMLTable(arr) {
+      if(typeof arr === "string") return `<div>${arr}</div>`;
+      if(!Array.isArray(arr)) return `<div>${arr}</div>`;
+      let html = '<table style="border:1px solid #aaa; border-collapse:collapse;">';
+      for(let i = 0; i < arr.length; i++){
+        html += "<tr>";
+        if(Array.isArray(arr[i])){
+          for(let j = 0; j < arr[i].length; j++){
+            html += `<td style="border:1px solid #aaa; padding:4px;">${arr[i][j]}</td>`;
+          }
+        } else {
+          html += `<td style="border:1px solid #aaa; padding:4px;">${arr[i]}</td>`;
+        }
+        html += "</tr>";
+      }
+      html += "</table>";
+      return html;
+    }
+    function updateKalmanGain(data) {
+      if(data.current_step < 2) {
+        kgPanel.classList.add("hidden");
+        return;
+      }
+      if(data.kalman_gain) {
+        kgPanel.classList.remove("hidden");
+        if(!kalmanGainHOT) {
+          kalmanGainHOT = new Handsontable(kgDiv, {
+            data: data.kalman_gain,
+            rowHeaders: true,
+            colHeaders: true,
+            readOnly: true,
+            licenseKey:"non-commercial-and-evaluation"
+          });
+        } else {
+          kalmanGainHOT.updateSettings({data: data.kalman_gain});
+        }
+      } else {
+        kgPanel.classList.add("hidden");
+      }
+    }
+    document.getElementById("nextStepBtn").onclick = () => {
+      fetch("/next_step", { method: "POST" })
+        .then(res => res.json())
+        .then(_ => fetchGraphStep())
+        .catch(e => console.error("Error next step:", e));
+    };
+    document.getElementById("prevStepBtn").onclick = () => {
+      fetch("/prev_step", { method: "POST" })
+        .then(res => res.json())
+        .then(_ => fetchGraphStep())
+        .catch(e => console.error("Error prev step:", e));
+    };
+    document.getElementById("backToInputBtn").onclick = () => {
+      document.getElementById("diagramPanel").classList.add("hidden");
+      document.getElementById("matrixInputPanel").classList.remove("hidden");
+      kgPanel.classList.add("hidden");
+    };
+  </script>
+</body>
+</html>

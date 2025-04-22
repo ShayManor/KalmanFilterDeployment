@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "gridjs": "^6.2.0",
+    "handsontable": "^15.1.0",
+    "jspreadsheet-ce": "^5.0.0"
+  }
+}
