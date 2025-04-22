@@ -155,11 +155,13 @@ def get_graph_step():
                         node["distribution"] = {"mean": mean_latex, "cov": "0"}
                         node["bottomLabel"] = "$\\bigl(h_1(\\hat{x}_{1|0}),\\;0\\bigr)$"
                     elif current_step == 1:
+                        node["color"] = PINK
                         S_mat = kalman_results.get("R")
                         cov_latex = matrix_to_latex(S_mat) if S_mat is not None else "$S_1$"
                         node["distribution"] = {"mean": mean_latex, "cov": cov_latex}
                         node["bottomLabel"] = "$\\bigl(h_1(\\hat{x}_{1|0}),\\;R_1\\bigr)$"
                     else:
+                        node["color"] = PINK
                         S_mat = kalman_results.get("S")
                         cov_latex = matrix_to_latex(S_mat) if S_mat is not None else "$S_1$"
                         node["distribution"] = {"mean": mean_latex, "cov": cov_latex}
